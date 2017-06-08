@@ -59,6 +59,8 @@ namespace FontAtlasGen
         /// <param name="verticalAdjust">Vertical offset applied to each glyph. Proper value varies from font to font.</param>
         public void AddCharactersToMesh(string charString, Font font, int fontSize, int columnCount, IntVector2 glyphDimensions, int verticalAdjust)
         {
+
+
             font.RequestCharactersInTexture(charString, fontSize);
 
             if (string.IsNullOrEmpty(charString))

@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using FontAtlasGen.Util;
+using System.Collections.Generic;
 
 namespace FontAtlasGen.FontAtlasGenEditor
 {
@@ -51,6 +52,8 @@ namespace FontAtlasGen.FontAtlasGenEditor
         [SerializeField]
         IntVector2 glyphDimensions_ = new IntVector2(8, 8);
 
+        HashSet<char> toRemove_ = new HashSet<char>();
+
         /// <summary>
         /// Vertical offset applied to each glyph on the tilesheet. The proper value seems
         /// to vary from Font to Font, and as far as I can see the only way to get the right
@@ -79,6 +82,19 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
         [SerializeField]
         Color textColor_ = Color.white;
+
+        enum UnsupportedGlyphHandling
+        {
+            // Do nothing, let unity handle it
+            Fallback,
+            // Replace any unsupported characters with an empty glyph
+            Empty,
+            // Remove unsupported characters from the input string
+            Remove
+        }
+
+        [SerializeField]
+        UnsupportedGlyphHandling unsupportedGlyphHandling_ = UnsupportedGlyphHandling.Empty;
 
         FontAtlasMesh mesh_ = new FontAtlasMesh();
 
@@ -114,6 +130,47 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
         void RebuildTexture(IntVector2 totalPixels)
         {
+            toRemove_.Clear();
+
+            Debug.Log("Before string op " + glyphString_);
+
+            switch( unsupportedGlyphHandling_ )
+            {
+                case UnsupportedGlyphHandling.Empty:
+                {
+                    foreach( char ch in glyphString_ )
+                    {
+                        if (!font_.HasCharacter(ch))
+                        {
+                            //Debug.LogFormat("Char {0} unsupported", ch);
+                            toRemove_.Add(ch);
+                        }
+                    }
+                    foreach (char ch in toRemove_)
+                    {
+                        glyphString_ = glyphString_.Replace(ch, ' ');
+                    }
+                }
+                break;
+
+                case UnsupportedGlyphHandling.Remove:
+                {
+                    foreach (char ch in glyphString_)
+                    {
+                        if (!font_.HasCharacter(ch))
+                        {
+                            //Debug.LogFormat("Char {0} unsupported", ch);
+                            toRemove_.Add(ch);
+                        }
+                    }
+                    glyphString_ = CleanString(glyphString_, toRemove_);
+                }
+                break;
+            }
+
+            Debug.Log("After string op" + glyphString_);
+            
+
             // Set up our font
             font_.RequestCharactersInTexture(glyphString_, fontSize_);
             font_.material.mainTexture.filterMode = FilterMode.Point;
@@ -219,6 +276,11 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
                 glyphDimensions_.x = EditorGUILayout.IntField("Glyph Width", glyphDimensions_.x);
                 glyphDimensions_.y = EditorGUILayout.IntField("Glyph Height", glyphDimensions_.y);
+
+                unsupportedGlyphHandling_ = (UnsupportedGlyphHandling)EditorGUILayout.EnumPopup(
+                    "Unsupported Glyph Handling", unsupportedGlyphHandling_);
+                
+
             }
             EditorGUI.indentLevel--;
 
@@ -373,6 +435,17 @@ namespace FontAtlasGen.FontAtlasGenEditor
         @" ☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼ !""#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ";
 
 
+        public static string CleanString(string str, HashSet<char> toRemove )
+        {
+            var result = new System.Text.StringBuilder(str.Length);
+
+            for (int i = 0; i < str.Length; i++)
+            {
+                if (!toRemove.Contains(str[i]))
+                    result.Append(str[i]);
+            }
+            return result.ToString();
+        }
     }
 
 }
