@@ -1,0 +1,22 @@
+fileFormatVersion: 2
+guid: a43bad61ba97fe341945180380e5fd4a
+timeCreated: 1496898090
+licenseType: Free
+TrueTypeFontImporter:
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: Px437 ATI SmallW 6x8
+  fontNames:
+  - Px437 ATI SmallW 6x8
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: 4a6b0fefd1076b64781899ac062c790e, type: 3}
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
