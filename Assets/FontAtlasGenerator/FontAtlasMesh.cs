@@ -92,6 +92,7 @@ namespace FontAtlasGen
                     AddUVs(charInfo);
                 }
             }
+            
 
             mesh.SetVertices(verts_);
             mesh.SetTriangles(tris_, 0);

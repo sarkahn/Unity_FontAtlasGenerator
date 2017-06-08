@@ -28,6 +28,21 @@ namespace FontAtlasGen.FontAtlasGenEditor
             }
         }
 
+        [SerializeField]
+        Material fallbackMat_;
+        Material FallbackMat_
+        {
+            get
+            {
+                if (fallbackMat_ == null)
+                {
+                    fallbackMat_ = new Material(Shader.Find("GUI/Text Shader"));
+                    fallbackMat_.hideFlags = HideFlags.HideAndDontSave;
+                }
+                return fallbackMat_;
+            }
+        }
+
         Texture2D grabTexture_ = null;
         RenderTexture renderTexture_ = null;
 
@@ -35,7 +50,18 @@ namespace FontAtlasGen.FontAtlasGenEditor
         int fontSize_ = 8;
 
         [SerializeField]
+        int lastFontSize_;
+
+        [SerializeField]
+        int fallbackFontSize_ = 8;
+        
+
+
+        [SerializeField]
         string glyphString_ = "a";
+
+        [SerializeField]
+        string fallbackString_ = "";
 
         [SerializeField]
         string customString_ = "Custom";
@@ -51,9 +77,6 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
         [SerializeField]
         IntVector2 glyphDimensions_ = new IntVector2(8, 8);
-
-        HashSet<char> toRemove_ = new HashSet<char>();
-
         /// <summary>
         /// Vertical offset applied to each glyph on the tilesheet. The proper value seems
         /// to vary from Font to Font, and as far as I can see the only way to get the right
@@ -61,6 +84,9 @@ namespace FontAtlasGen.FontAtlasGenEditor
         /// </summary>
         [SerializeField]
         int verticalOffset_ = 1;
+
+        [SerializeField]
+        int fallbackVerticalOffset_ = 1;
 
         /// <summary>
         /// The maximum number of glyphs per row.
@@ -82,10 +108,12 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
         [SerializeField]
         Color textColor_ = Color.white;
+       
+
 
         enum UnsupportedGlyphHandling
         {
-            // Do nothing, let unity handle it
+            // Specify a fallback font to pull glyphs from if the original font doesn't support it
             Fallback,
             // Replace any unsupported characters with an empty glyph
             Empty,
@@ -96,12 +124,34 @@ namespace FontAtlasGen.FontAtlasGenEditor
         [SerializeField]
         UnsupportedGlyphHandling unsupportedGlyphHandling_ = UnsupportedGlyphHandling.Empty;
 
+        /// <summary>
+        /// Fallback font for <seealso cref="UnsupportedGlyphHandling.Fallback"/> with Unicode fonts.
+        /// </summary>
+        [SerializeField]
+        Font fallbackFont_ = null;
+
         FontAtlasMesh mesh_ = new FontAtlasMesh();
+
+        FontAtlasMesh fallbackMesh_ = new FontAtlasMesh();
 
         [MenuItem("Window/FontAtlasGenerator", false, 500)]
         static void MakeWindow()
         {
             GetWindow<FontAtlasGeneratorEditorWindow>().Show();
+        }
+
+        enum ToolbarItem
+        {
+            Font = 0,
+            Glyphs = 1,
+            Atlas = 2,
+        };
+
+        ToolbarItem selectedToolbar_ = ToolbarItem.Font;
+
+        private void OnEnable()
+        {
+            lastFontSize_ = fontSize_;
         }
 
         void OnDisable()
@@ -113,74 +163,70 @@ namespace FontAtlasGen.FontAtlasGenEditor
         void OnGUI()
         {
             bool updateTex = false;
+            
+            string[] toolbarNames = null;
+
+            if( font_ != null )
+            {
+                toolbarNames = System.Enum.GetNames(typeof(ToolbarItem));
+            }
+            // If we haven't selected a font, only show the font gui.
+            else
+            {
+                toolbarNames = new string[] { "Font" };
+            }
+
+            selectedToolbar_ = (ToolbarItem)GUILayout.Toolbar((int)selectedToolbar_, toolbarNames,  GUILayout.Height(40));
 
             EditorGUI.BeginChangeCheck();
 
-            DrawFontGUI();
-
-            if (font_ == null)
-                return;
-
-            DrawGlyphGUI();
+            switch( selectedToolbar_ )
+            {
+                case ToolbarItem.Font:
+                    DrawFontGUI();
+                break;
+                case ToolbarItem.Glyphs:
+                    DrawGlyphGUI();
+                break;
+                case ToolbarItem.Atlas:
+                    DrawAtlasGUI();
+                break;
+            }
+            
 
             updateTex = EditorGUI.EndChangeCheck();
 
-            DrawPreviewGUI(updateTex);
+            if( fontSize_ != lastFontSize_ )
+            {
+                lastFontSize_ = fontSize_;
+                updateTex = true;
+            }
+
+            if( font_ != null )
+            {
+                EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
+                DrawPreviewGUI(updateTex);
+            }
+        }
+
+        void SetupFontAndMesh(FontAtlasMesh mesh, Font font, int fontSize, string input, Material mat, int verticalAdjust )
+        {
+            font.RequestCharactersInTexture(input, fontSize);
+            font.material.mainTexture.filterMode = FilterMode.Point;
+            mat.mainTexture = font.material.mainTexture;
+            mat.color = textColor_;
+
+            mesh.AddCharactersToMesh(input, font, fontSize, 16, glyphDimensions_, verticalAdjust);
         }
 
         void RebuildTexture(IntVector2 totalPixels)
         {
-            toRemove_.Clear();
+            //Debug.Log("Before string op " + glyphString_);
 
-            Debug.Log("Before string op " + glyphString_);
-
-            switch( unsupportedGlyphHandling_ )
+            if( !font_.dynamic )
             {
-                case UnsupportedGlyphHandling.Empty:
-                {
-                    foreach( char ch in glyphString_ )
-                    {
-                        if (!font_.HasCharacter(ch))
-                        {
-                            //Debug.LogFormat("Char {0} unsupported", ch);
-                            toRemove_.Add(ch);
-                        }
-                    }
-                    foreach (char ch in toRemove_)
-                    {
-                        glyphString_ = glyphString_.Replace(ch, ' ');
-                    }
-                }
-                break;
-
-                case UnsupportedGlyphHandling.Remove:
-                {
-                    foreach (char ch in glyphString_)
-                    {
-                        if (!font_.HasCharacter(ch))
-                        {
-                            //Debug.LogFormat("Char {0} unsupported", ch);
-                            toRemove_.Add(ch);
-                        }
-                    }
-                    glyphString_ = CleanString(glyphString_, toRemove_);
-                }
-                break;
+                HandleUnsupportedGlyphs(ref glyphString_, ref fallbackString_, font_, fallbackFont_);
             }
-
-            Debug.Log("After string op" + glyphString_);
-            
-
-            // Set up our font
-            font_.RequestCharactersInTexture(glyphString_, fontSize_);
-            font_.material.mainTexture.filterMode = FilterMode.Point;
-
-            // Set up our material
-            var mat = Material_;
-            mat.mainTexture = font_.material.mainTexture;
-
-            // Build the mesh
-            mesh_.AddCharactersToMesh(glyphString_, font_, fontSize_, 16, glyphDimensions_, verticalOffset_);
 
             // Ensure our grab texture is the proper size
             if (grabTexture_ == null || grabTexture_.width != totalPixels.x || grabTexture_.height != totalPixels.y)
@@ -214,14 +260,25 @@ namespace FontAtlasGen.FontAtlasGenEditor
             GL.PushMatrix();
             GL.Clear(true, true, backgroundColor_);
 
-            mat.color = textColor_;
 
-            mat.SetPass(0);
             GL.LoadPixelMatrix(0,
                 totalPixels.x, 0,
                 totalPixels.y);
 
+            SetupFontAndMesh(mesh_, font_, fontSize_, glyphString_, Material_, verticalOffset_);
+
+            Material_.SetPass(0);
+
             Graphics.DrawMeshNow(mesh_.Mesh_, Vector3.zero, Quaternion.identity);
+            
+            if (unsupportedGlyphHandling_ == UnsupportedGlyphHandling.Fallback)
+            {
+                SetupFontAndMesh(fallbackMesh_, fallbackFont_, fallbackFontSize_, fallbackString_, FallbackMat_, fallbackVerticalOffset_);
+
+                FallbackMat_.SetPass(0);
+
+                Graphics.DrawMeshNow(fallbackMesh_.Mesh_, new Vector3(0, 0, -1), Quaternion.identity);
+            }
 
             // Grab the our mesh from the render texture.
             grabTexture_.ReadPixels(new Rect(0, 0, totalPixels.x, totalPixels.y), 0, 0);
@@ -237,15 +294,26 @@ namespace FontAtlasGen.FontAtlasGenEditor
         /// </summary>
         void DrawFontGUI()
         {
-            EditorGUILayout.LabelField("Font", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             {
-                font_ = (Font)EditorGUILayout.ObjectField(font_, typeof(Font), false);
+                font_ = (Font)EditorGUILayout.ObjectField("Font", font_, typeof(Font), false);
 
 
                 if (font_ != null)
                 {
-                    fontSize_ = EditorGUILayout.IntField("Font Size", fontSize_);
+                    if (font_.dynamic)
+                    {
+                        fontSize_ = EditorGUILayout.IntField("Font Size", fontSize_);
+                    }
+                    else
+                    {
+                        var style = new GUIStyle(EditorStyles.label);
+                        style.richText = true;
+                        fontSize_ = font_.fontSize;
+                        EditorGUILayout.LabelField("Current size: <b>" + font_.fontSize + "</b>", style );
+
+                        EditorGUILayout.LabelField("For non-dynamic fonts size must be controlled from the asset in the project view. Make sure you hit apply after you change the size.", EditorStyles.wordWrappedLabel);
+                    }
                 }
             }
             EditorGUI.indentLevel--;
@@ -253,7 +321,6 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
         void DrawGlyphGUI()
         {
-            EditorGUILayout.LabelField("Glyphs", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             {
                 selectedGlyphs_ = (SelectedGlyphs)EditorGUILayout.EnumPopup("Characters", selectedGlyphs_);
@@ -276,24 +343,59 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
                 glyphDimensions_.x = EditorGUILayout.IntField("Glyph Width", glyphDimensions_.x);
                 glyphDimensions_.y = EditorGUILayout.IntField("Glyph Height", glyphDimensions_.y);
-
-                unsupportedGlyphHandling_ = (UnsupportedGlyphHandling)EditorGUILayout.EnumPopup(
-                    "Unsupported Glyph Handling", unsupportedGlyphHandling_);
-                
-
-            }
-            EditorGUI.indentLevel--;
-
-            EditorGUILayout.LabelField("Atlas", EditorStyles.boldLabel);
-            EditorGUI.indentLevel++;
-            {
-                columnCount_ = EditorGUILayout.IntField("Column Count", columnCount_);
-
                 string tooltip =
                     "Vertical offset applied to each glyph on the tilesheet. May need slight tweaking from font to font.";
                 var vertOffsetContent = new GUIContent(
                     "Vertical Offset", tooltip);
                 verticalOffset_ = EditorGUILayout.IntField(vertOffsetContent, verticalOffset_);
+
+                EditorGUILayout.LabelField("Unsupported Glyph Handling", EditorStyles.boldLabel);
+                EditorGUI.indentLevel++;
+                {
+                    if (font_.dynamic)
+                    {
+                        {
+                            EditorGUILayout.LabelField("Font is currently set to dynamic. For dynamic fonts Unity doesn't provide" +
+                                " a way to distinguis unsupported characters - they will automatically be replaced with fallback characters." +
+                                " For unsupported glyph handling you must set the font asset to unicode in the project view.",
+                                EditorStyles.wordWrappedLabel);
+                        }
+
+                    }
+                    else
+                    {
+                        unsupportedGlyphHandling_ = 
+                            (UnsupportedGlyphHandling)EditorGUILayout.EnumPopup(unsupportedGlyphHandling_);
+
+                        if( unsupportedGlyphHandling_ == UnsupportedGlyphHandling.Fallback )
+                        {
+                            
+                            fallbackFont_ = (Font)EditorGUILayout.ObjectField("Fallback Font", fallbackFont_, typeof(Font), false);
+                            if( fallbackFont_.dynamic )
+                            {
+                                fallbackFontSize_ = EditorGUILayout.IntField("Fallback Font Size", fallbackFontSize_);
+                            }
+                            fallbackVerticalOffset_ = EditorGUILayout.IntField("Fallback Vertical Offset", fallbackVerticalOffset_);
+                        }
+                    }
+
+                }
+                EditorGUI.indentLevel--;
+
+            }
+            EditorGUI.indentLevel--;
+
+        }
+
+        void DrawAtlasGUI()
+        {
+            EditorGUI.indentLevel++;
+            {
+                backgroundColor_ = EditorGUILayout.ColorField("Background Color", backgroundColor_);
+
+                textColor_ = EditorGUILayout.ColorField("Text Color", textColor_);
+
+                columnCount_ = EditorGUILayout.IntField("Column Count", columnCount_);
             }
             EditorGUI.indentLevel--;
         }
@@ -308,15 +410,6 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
             EditorGUI.indentLevel++;
             {
-
-                EditorGUI.BeginChangeCheck();
-
-                backgroundColor_ = EditorGUILayout.ColorField("Background Color", backgroundColor_);
-
-                textColor_ = EditorGUILayout.ColorField("Text Color", textColor_);
-
-                updateTex |= EditorGUI.EndChangeCheck();
-
                 EditorGUILayout.BeginHorizontal();
                 {
                     drawPreviewGrid_ = EditorGUILayout.Toggle("Draw Preview Grid", drawPreviewGrid_);
@@ -445,6 +538,74 @@ namespace FontAtlasGen.FontAtlasGenEditor
                     result.Append(str[i]);
             }
             return result.ToString();
+        }
+
+        string HandleUnsupportedGlyphs(ref string input, ref string fallbackString, Font font, Font fallbackFont)
+        {
+            HashSet<char> toRemove = new HashSet<char>();
+
+            foreach (char ch in input)
+            {
+                if (!font.HasCharacter(ch))
+                {
+                    toRemove.Add(ch);
+                }
+            }
+
+            switch (unsupportedGlyphHandling_)
+            {
+                case UnsupportedGlyphHandling.Empty:
+                {
+                    foreach (char ch in toRemove)
+                    {
+                        input = input.Replace(ch, ' ');
+                    }
+                }
+                break;
+
+                case UnsupportedGlyphHandling.Remove:
+                {
+                    input = CleanString(input, toRemove);
+                }
+                break;
+
+                case UnsupportedGlyphHandling.Fallback:
+                {
+                    // Copy our input to fallback.
+                    fallbackString = input;
+                    
+                    // Run through each char in our input
+                    for( int i = 0; i < input.Length; ++i )
+                    {
+                        char ch = input[i];
+
+                        // Remove characters that our primary font has or
+                        // that our fallback font doesn't
+                        if( font.HasCharacter(ch ) || !fallbackFont.HasCharacter(ch) )
+                        {                        
+                            // If this isn't a fallback character or if our fallback
+                            // character isn't in our fallback font then we'll blank
+                            // it out on our fallback string
+
+                            // This will leave us with a string of the identical length
+                            // to the input but all non-fallback-able chars blanked out
+                            fallbackString = fallbackString.Replace(ch, ' ');
+                        }
+
+                        if( !font.HasCharacter(ch) )
+                        {
+                            input = input.Replace(ch, ' ');
+                        }
+                        
+                    }
+
+                    //Debug.Log("Input: " + input);
+                    //Debug.Log("Fallback: " + fallbackString);
+                    
+                }
+                break;
+            }
+            return input;
         }
     }
 
