@@ -54,8 +54,9 @@ namespace FontAtlasGen.FontAtlasGenEditor
 
         [SerializeField]
         int fallbackFontSize_ = 8;
-        
 
+        [SerializeField]
+        int lastFallbackFontSize_ = 0;
 
         [SerializeField]
         string glyphString_ = "a";
@@ -152,6 +153,7 @@ namespace FontAtlasGen.FontAtlasGenEditor
         private void OnEnable()
         {
             lastFontSize_ = fontSize_;
+            lastFallbackFontSize_ = fallbackFontSize_;
         }
 
         void OnDisable()
@@ -199,6 +201,13 @@ namespace FontAtlasGen.FontAtlasGenEditor
             if( fontSize_ != lastFontSize_ )
             {
                 lastFontSize_ = fontSize_;
+                updateTex = true;
+            }
+
+            if( unsupportedGlyphHandling_ == UnsupportedGlyphHandling.Fallback && !fallbackFont_.dynamic &&
+                 lastFallbackFontSize_ != fallbackFontSize_ )
+            {
+                lastFallbackFontSize_ = fallbackFontSize_;
                 updateTex = true;
             }
 
