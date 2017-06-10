@@ -304,7 +304,7 @@ namespace FontAtlasGen.FontAtlasGenEditor
             Graphics.DrawMeshNow(mesh_.Mesh_, Vector3.zero, Quaternion.identity);
             
             // If we're using it, render our fallback mesh on top.
-            if (unsupportedGlyphHandling_ == UnsupportedGlyphHandling.Fallback && fallbackFont_ != null )
+            if (!font_.dynamic && unsupportedGlyphHandling_ == UnsupportedGlyphHandling.Fallback && fallbackFont_ != null )
             {
                 SetupFontAndMesh(fallbackMesh_, fallbackFont_, fallbackFontSize_, fallbackString_, FallbackMat_, fallbackVerticalOffset_);
 
