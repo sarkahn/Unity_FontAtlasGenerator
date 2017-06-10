@@ -54,13 +54,11 @@ namespace FontAtlasGen
         /// <param name="charString">The characters to build into the mesh. They will be written in order with no filtering applied.</param>
         /// <param name="font">The font to draw our characters from.</param>
         /// <param name="fontSize">The font size when retrieving characters from the font.</param>
-        /// <param name="columnCount">How many glyphs to draw in a row before moving to the next row.</param>
+        /// <param name="xCount">How many glyphs to draw in a row before moving to the next row.</param>
         /// <param name="glyphDimensions">The dimensions of each glyph.</param>
         /// <param name="verticalAdjust">Vertical offset applied to each glyph. Proper value varies from font to font.</param>
-        public void AddCharactersToMesh(string charString, Font font, int fontSize, int columnCount, IntVector2 glyphDimensions, int verticalAdjust)
+        public void AddCharactersToMesh(string charString, Font font, int fontSize, int xCount, IntVector2 glyphDimensions, int verticalAdjust)
         {
-
-
             font.RequestCharactersInTexture(charString, fontSize);
 
             if (string.IsNullOrEmpty(charString))
@@ -74,13 +72,13 @@ namespace FontAtlasGen
             var mesh = Mesh_;
 
             mesh.Clear();
-
-            columnCount = Mathf.CeilToInt((float)charString.Length / columnCount);
+            
+            int yCount = Mathf.CeilToInt((float)charString.Length / xCount);
             int charIndex = 0;
-
-            for (int y = columnCount - 1; y >= 0; --y)
+            
+            for (int y = yCount - 1; y >= 0; --y)
             {
-                for (int x = 0; x < columnCount && charIndex < charString.Length; ++x)
+                for (int x = 0; x < xCount && charIndex < charString.Length; ++x)
                 {
                     char ch = charString[charIndex++];
 
